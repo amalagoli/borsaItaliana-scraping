@@ -13,9 +13,7 @@ from .sessione import Sessione
 from .tipi import StrumentoLista
 
 # URL lista BTP
-_URL_LISTA_BTP = (
-    "https://www.borsaitaliana.it/borsa/obbligazioni/mot/btp/lista.html"
-)
+_URL_LISTA_BTP = "https://www.borsaitaliana.it/borsa/obbligazioni/mot/btp/lista.html"
 
 
 def _pulisci(testo: str) -> str:
@@ -38,12 +36,17 @@ def _parsa_numero_lista(testo: str, lingua: str = "en") -> Decimal | None:
         return None
 
 
-def _parsa_data_lista(testo: str) -> date | None:
+def _parsa_data_lista(testo: str, lingua: str = "en") -> date | None:
     """Parsa una data dalla tabella lista."""
     testo = _pulisci(testo)
     if not testo or testo == "-":
         return None
-    for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d/%m/%y", "%Y/%m/%d"):
+    # ("%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d/%m/%y", "%Y/%m/%d")
+    if lingua == "en":
+        use_formats = ("%Y/%m/%d", "%y/%m/%d")
+    else:
+        use_formats = ("%d/%m/%Y", "%d/%m/%y")
+    for fmt in use_formats:
         try:
             return datetime.strptime(testo, fmt).date()
         except ValueError:
@@ -59,7 +62,7 @@ def _estrai_isin_da_link(cella: BeautifulSoup) -> str | None:
     (es. "OBBLIGAZIONI" che ha 12 lettere maiuscole).
     """
     # Pattern ISIN: esattamente 2 lettere + 10 tra cui almeno 1 cifra, con word boundary
-    isin_re = re.compile(r'\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b')
+    isin_re = re.compile(r"\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b")
 
     link = cella.find("a")
     if link:
@@ -157,7 +160,7 @@ def lista_btp(
             elif "expiry" in h or "scadenza" in h or "maturity" in h:
                 idx_scadenza = i
 
-        for riga in righe[header_idx + 1:]:
+        for riga in righe[header_idx + 1 :]:
             celle = riga.find_all("td")
             if not celle:
                 continue
@@ -200,7 +203,7 @@ def lista_btp(
             # Scadenza
             scadenza: date | None = None
             if idx_scadenza is not None and idx_scadenza < len(celle):
-                scadenza = _parsa_data_lista(celle[idx_scadenza].get_text())
+                scadenza = _parsa_data_lista(celle[idx_scadenza].get_text(), lingua)
 
             risultati.append(
                 StrumentoLista(

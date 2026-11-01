@@ -59,16 +59,24 @@ def _parsa_numero(testo: str, lingua: str = "en") -> Decimal | None:
         return None
 
 
-def _parsa_data_scheda(testo: str) -> date | None:
+def _parsa_data_scheda(testo: str, lingua: str = "en") -> date | None:
     """Parsa una data dalla pagina scheda (formati vari).
 
     Supporta sia anni a 4 cifre (``dd/mm/YYYY``) che a 2 cifre
     (``dd/mm/YY`` → interpretato come 20YY).
     """
+    _EU_FORMATS = ("%d/%m/%Y", "%d/%m/%y")
+    # _OTHER_FORMATS = ("%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%y/%m/%d")
+    _OTHER_FORMATS = ("%Y-%m-%d", "%y/%m/%d")
+    if lingua == "it":
+        _formats = _EU_FORMATS
+    else:
+        _formats = _OTHER_FORMATS
+
     testo = _pulisci_testo(testo)
     if not testo or testo == "-":
         return None
-    for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%y/%m/%d"):
+    for fmt in _formats:
         try:
             return datetime.strptime(testo, fmt).date()
         except ValueError:
@@ -644,7 +652,7 @@ def _arricchisci_obbligazione(
             "Data Scadenza",
         ],
     )
-    scheda.scadenza = _parsa_data_scheda(val) if val else None
+    scheda.scadenza = _parsa_data_scheda(val, lingua) if val else None
 
     # Emittente
     val = _trova_valore(
@@ -771,7 +779,7 @@ def _arricchisci_obbligazione(
             "Reference Price Date",
         ],
     )
-    scheda.data_prezzo_riferimento = _parsa_data_scheda(val) if val else None
+    scheda.data_prezzo_riferimento = _parsa_data_scheda(val, "it") if val else None
 
     # Data primo giorno di negoziazione
     val = _trova_valore(
@@ -782,7 +790,7 @@ def _arricchisci_obbligazione(
             "Prima Data di Negoziazione",
         ],
     )
-    scheda.data_primo_giorno = _parsa_data_scheda(val) if val else None
+    scheda.data_primo_giorno = _parsa_data_scheda(val, lingua) if val else None
 
 
 def _arricchisci_azione(
