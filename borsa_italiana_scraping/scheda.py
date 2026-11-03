@@ -78,7 +78,11 @@ def _parsa_data_scheda(testo: str, lingua: str = "en") -> date | None:
         return None
     for fmt in _formats:
         try:
-            return datetime.strptime(testo, fmt).date()
+            val_date = datetime.strptime(testo, fmt).date()
+            # When the dateform is with two-digit years, there is a problem with verylong dated expirations
+            if val_date.year < datetime.now().year:
+                val_date = val_date.replace(year=val_date.year + 100)
+            return val_date
         except ValueError:
             continue
     return None
@@ -309,7 +313,7 @@ def _estrai_valuta_denominazione(soup: BeautifulSoup) -> str | None:
 def ottieni_scheda(
     isin: str,
     mic: str | None = None,
-    lingua: str = "en",
+    lingua: str = "it",
     sessione: Sessione | None = None,
     platform: str | None = None,
     url_diretto: str | None = None,
