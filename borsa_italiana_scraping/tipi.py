@@ -105,6 +105,7 @@ class SchedaStrumento:
     mercato: str
 
     # --- Campi comuni ---
+    codice_strumento: str | None = None
     descrizione: str | None = None            # meta description della pagina
     url_pagina: str | None = None             # URL canonico della scheda
     valuta_liquidazione: str | None = None     # Settlement currency (se diversa)
@@ -113,7 +114,9 @@ class SchedaStrumento:
     massimo_anno: Decimal | None = None        # Year High
     apertura: Decimal | None = None            # Opening price
     minimo_giorno: Decimal | None = None       # Day Low
-    massimo_giorno: Decimal | None = None      # Day High
+    massimo_giorno: Decimal | None = None
+    volume_totale: Decimal | None = None
+    controvalore: Decimal | None = None   # Day High
 
     # --- Campi specifici obbligazioni (None per azioni) ---
     rendimento_lordo: Decimal | None = None
@@ -129,13 +132,18 @@ class SchedaStrumento:
     lotto_minimo: int | None = None
     descrizione_payout: str | None = None
     frequenza_cedola: str | None = None        # Quarterly, Semiannual, Annual...
+    data_prima_cedola: date | None = None
+    modalita_negoziazione: str | None = None    # P.es. Corso Secco, Clean
     convenzione_giorni: str | None = None      # ACT/ACT (ICMA), 30/360, ...
     struttura_bond: str | None = None          # Fixed Rate, Structured Interest Rate...
     outstanding: Decimal | None = None         # Ammontare in circolazione
-    tipologia: str | None = None               # Italian Government Bonds, Corporate, ...
+    tipologia: str | None = None
+    prezzo_ufficiale: Decimal | None = None
+    data_prezzo_ufficiale: date | None = None               # Italian Government Bonds, Corporate, ...
     prezzo_riferimento: Decimal | None = None   # Reference price
     data_prezzo_riferimento: date | None = None # Reference price date
     data_primo_giorno: date | None = None       # First Day of Trading
+    clearing_settlement: str | None = None # The clearing/settlement venue       # First Day of Trading
 
     # --- Campi specifici azioni (None per obbligazioni) ---
     settore: str | None = None
@@ -160,3 +168,4 @@ class StrumentoLista:
     cedola: Decimal | None
     scadenza: date | None
     mic: str
+    link: str | None

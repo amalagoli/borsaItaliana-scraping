@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from borsa_italiana_scraping import ottieni_scheda, Sessione
+from borsa_italiana_scraping import Sessione, ottieni_scheda
 from borsa_italiana_scraping.tipi import SchedaStrumento
 
 ISIN_ENEL = "IT0003128367"

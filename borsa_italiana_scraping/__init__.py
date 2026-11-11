@@ -4,8 +4,6 @@ Esporta tutte le funzioni e i tipi dell'API pubblica.
 """
 
 # Sessione HTTP
-from .sessione import Sessione
-
 # Eccezioni
 from .eccezioni import (
     BorsaItalianaErrore,
@@ -16,6 +14,20 @@ from .eccezioni import (
     StrumentoNonRisolto,
     StrumentoNonTrovato,
 )
+from .fondi import (
+    DatiFondo,
+    estrai_codice_da_url,
+    ottieni_dati_fondo,
+    ottieni_dati_fondo_da_url,
+)
+from .lista import lista_btp
+from .ricerca import cerca
+from .scheda import ottieni_scheda
+from .sessione import Sessione
+
+# Funzioni
+from .storico import ottieni_storico
+from .tempo_reale import ottieni_intraday, ottieni_prezzo_corrente
 
 # Tipi di dati
 from .tipi import (
@@ -29,22 +41,9 @@ from .tipi import (
     StrumentoLista,
 )
 
-# Funzioni
-from .storico import ottieni_storico
-from .tempo_reale import ottieni_intraday, ottieni_prezzo_corrente
-from .ricerca import cerca
-from .scheda import ottieni_scheda
-from .fondi import (
-    DatiFondo,
-    estrai_codice_da_url,
-    ottieni_dati_fondo,
-    ottieni_dati_fondo_da_url,
-)
-from .lista import lista_btp
-
 __version__ = "0.3.5"
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     # Sessione
     "Sessione",
     # Eccezioni

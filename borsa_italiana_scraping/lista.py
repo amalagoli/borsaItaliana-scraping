@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from bs4 import BeautifulSoup
@@ -14,13 +14,15 @@ from .scheda import _parsa_data
 from .sessione import Sessione
 from .tipi import StrumentoLista
 
+_URL_BORSA_ITALIANA = "https://www.borsaitaliana.it"
+
 # URL lista BTP
 _URL_LISTA_BTP = (
     "https://www.borsaitaliana.it/borsa/obbligazioni/mot/btp/lista.html"
 )
 
 # The list is split into pages of 20 rows (?page=N): 12 pages in November 2026.
-_MAX_PAGINE_LISTA = 50
+_MAX_PAGINE_LISTA = 200
 _PAUSA_TRA_PAGINE = 1.0
 
 
@@ -82,6 +84,35 @@ def _estrai_isin_da_link(cella: BeautifulSoup) -> str | None:
         return match.group(1)
     return None
 
+def _estrai_link_for_isin(cella: BeautifulSoup) -> str | None:
+    """Estrae il link per un dato isin
+
+    L'ISIN ha formato: 2 lettere paese + 9 alfanumerici + 1 check digit.
+    Usiamo un pattern più restrittivo per evitare falsi positivi
+    (es. "OBBLIGAZIONI" che ha 12 lettere maiuscole).
+    """
+    # Pattern ISIN: esattamente 2 lettere + 10 tra cui almeno 1 cifra, con word boundary
+    isin_re = re.compile(r'\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b')
+
+    link = cella.find("a")
+    if link:
+        href = str(link.get("href", "")).upper()
+        match = isin_re.search(href)
+        if match:
+            return _URL_BORSA_ITALIANA + href.lower()
+    # Fallback: tutti i link nella cella
+    for link in cella.find_all("a"):
+        href = str(link.get("href", "")).upper()
+        match = isin_re.search(href)
+        if match:
+            return _URL_BORSA_ITALIANA + href.lower()
+    # Fallback: testo della cella
+    # testo = _pulisci(cella.get_text()).upper()
+    # match = isin_re.search(testo)
+    # if match:
+    #    return match.group(1)
+    return None
+
 
 def _estrai_mic_da_link(cella: BeautifulSoup) -> str:
     """Estrae il MIC dal link nella cella (es. IT0005634800-MOTX.html)."""
@@ -139,9 +170,11 @@ def _estrai_strumenti(tabella: BeautifulSoup, lingua: str) -> list[StrumentoList
         isin: str | None = None
         if idx_isin is not None and idx_isin < len(celle):
             isin = _estrai_isin_da_link(celle[idx_isin])
+            isin_link = _estrai_link_for_isin(celle[idx_isin])
         if not isin:
             # Prova dal primo link nella riga
             isin = _estrai_isin_da_link(riga)
+            isin_link = _estrai_link_for_isin(celle[idx_isin])
         if not isin:
             continue
 
@@ -183,6 +216,7 @@ def _estrai_strumenti(tabella: BeautifulSoup, lingua: str) -> list[StrumentoList
                 cedola=cedola,
                 scadenza=scadenza,
                 mic=mic,
+                link=isin_link
             )
         )
 
@@ -201,7 +235,10 @@ def _ha_pagina_successiva(soup: BeautifulSoup, pagina: int) -> bool | None:
     paginatore = soup.find("div", class_="m-pagination")
     if paginatore is None:
         return None
-    successiva = re.compile(rf"[?&]page={pagina + 1}(?:&|$)")
+    # successiva = re.compile(rf"[?&;]page={pagina + 1}(?:&|$)")
+    # AM: modificato il pattern di regex per catturare page=1', con ' incluso.
+    #     L'attributo href porta a un codice jscrcipt dove la URL e' inclusa in ''.
+    successiva = re.compile(rf"(;|&|amp;|\?)page={pagina + 1}('|&|$|'\))")
     return any(successiva.search(str(a.get("href", ""))) for a in paginatore.find_all("a"))
 
 

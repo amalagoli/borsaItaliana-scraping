@@ -193,7 +193,7 @@ def _trova_prezzo_principale(soup: BeautifulSoup, lingua: str) -> Decimal | None
                 return val
 
     # Cerca label "Last Price" / "Ultimo Prezzo" / "Price" / "Prezzo"
-    etichette = ["Last Price", "Ultimo Prezzo", "Price", "Prezzo", "Last", "Prezzo Ufficiale", "Official Price"]
+    etichette = ["Prezzo Ultimo Contratto", "Last Trade Price", "Last Price", "Ultimo Prezzo", "Price", "Prezzo", "Last",  "Official Price"]
     val_str = _trova_valore(soup, etichette)
     if val_str:
         val = _parsa_numero(val_str, lingua)
@@ -302,7 +302,8 @@ def _estrai_valuta(soup: BeautifulSoup, lingua: str) -> tuple[str, str | None]:
             parti = [p.strip() for p in val.split("/")]
             neg = parti[0] if len(parti[0]) == 3 and parti[0].isalpha() else "EUR"
             liq = parti[1] if len(parti) > 1 and len(parti[1]) == 3 and parti[1].isalpha() else None
-            return neg, liq if liq != neg else None
+            return neg, liq
+            # return neg, liq if liq != neg else None
         if len(val) == 3 and val.isalpha():
             return val, None
     return "EUR", None
@@ -326,7 +327,7 @@ def _estrai_valuta_denominazione(soup: BeautifulSoup) -> str | None:
 def ottieni_scheda(
     isin: str,
     mic: str | None = None,
-    lingua: str = "en",
+    lingua: str = "it",
     sessione: Sessione | None = None,
     platform: str | None = None,
     url_diretto: str | None = None,
@@ -449,6 +450,9 @@ def ottieni_scheda(
         massimo_anno = _parsa_numero(
             max_anno_raw.split("-")[0].strip() if max_anno_raw and "-" in max_anno_raw else (max_anno_raw or ""), lingua
         )
+        clearing_settlement = _trova_valore(soup,["Clearing/Settlement"])
+        val = _trova_valore(soup,["First Coupon Date", "Data Stacco prima Cedola"])
+        data_prima_cedola = _parsa_data(val, lingua) if val else None
 
         # Costruisci il risultato base
         scheda = SchedaStrumento(
@@ -468,6 +472,8 @@ def ottieni_scheda(
             massimo_giorno=massimo_giorno,
             minimo_anno=minimo_anno,
             massimo_anno=massimo_anno,
+            clearing_settlement=clearing_settlement,
+            data_prima_cedola=data_prima_cedola
         )
 
         # Campi specifici per obbligazioni
@@ -475,14 +481,18 @@ def ottieni_scheda(
             _arricchisci_obbligazione(scheda, soup, lingua)
             # Alcuni mercati (es. EuroTLX) non mostrano emittente/scadenza nella
             # pagina scheda: integra da dati-completi riempiendo solo i campi mancanti.
-            if scheda.emittente is None or scheda.scadenza is None:
-                if soup_dc is None:
-                    try:
-                        soup_dc = _scarica_dati_completi(isin, tipo, lingua, sessione, mic, url_finale=url_finale)
-                    except Exception:
-                        soup_dc = None
-                if soup_dc is not None:
-                    _integra_obbligazione_da_dati_completi(scheda, soup_dc, lingua)
+            # if scheda.emittente is None or scheda.scadenza is None:
+            #
+            # AM: rimosso il test per prezzi non trovati. Forza lo scaricamento dati completi
+            #     per avere maggiori dati.
+            #
+            if soup_dc is None:
+                try:
+                    soup_dc = _scarica_dati_completi(isin, tipo, lingua, sessione, mic, url_finale=url_finale)
+                except Exception:
+                    soup_dc = None
+            if soup_dc is not None:
+                _integra_obbligazione_da_dati_completi(scheda, soup_dc, lingua)
             _correggi_secolo_scadenza(scheda)
 
         # Campi specifici per azioni
@@ -591,6 +601,18 @@ def _integra_obbligazione_da_dati_completi(
         "prezzo_riferimento",
         "data_prezzo_riferimento",
         "data_primo_giorno",
+        "volume_totale",
+        "codice_strumento",
+        # AM: nuova aggiunta.
+        "modalita_negoziazione",
+        # AM: nuova aggiunta.
+        "volume_totale",
+        # AM: nuova aggiunta.
+        "prezzo_ufficiale",
+        # AM: nuova aggiunta.
+        "data_prezzo_ufficiale",
+        "valuta_liquidazione",
+        "valuta"
     )
     backup = {c: getattr(scheda, c, None) for c in campi}
     _arricchisci_obbligazione(scheda, soup_dc, lingua)
@@ -605,6 +627,34 @@ def _arricchisci_obbligazione(
     lingua: str,
 ) -> None:
     """Popola i campi specifici per obbligazioni."""
+
+    # AM: nuova aggiunta.
+    # Valuta Negoziazione
+    val = _trova_valore(
+        soup,
+        [
+            "Valuta di negoziazione",
+            "Valuta di Negoziazione",
+            "Negotiation currency",
+            "Negotiation Currency"
+        ],
+    )
+    if '/' in val:
+        val = val.split('/')[0]
+    scheda.valuta = val
+
+    # AM: nuova aggiunta.
+    # Valuta Negoziliquidazioneazione
+    val = _trova_valore(
+        soup,
+        [
+            "Settlement currency",
+            "Valuta di liquidazione",
+            "Valuta di Liquidazione",
+        ],
+    )
+    scheda.valuta_liquidazione = val
+
     # Rendimento lordo
     val = _trova_valore(
         soup,
@@ -693,6 +743,7 @@ def _arricchisci_obbligazione(
     )
     scheda.cedola_periodale = _parsa_percentuale(val, lingua) if val else None
 
+    # Scadenza
     # Scadenza. Exact match first: as substrings, "Scadenza" and "Maturity" also
     # match the yield rows ("Rendimento effettivo a scadenza lordo",
     # "Gross yield to maturity"), which come earlier in the scheda page.
@@ -726,9 +777,31 @@ def _arricchisci_obbligazione(
             "Tipo Cedola",
             "Bond Type",
             "Tipo Obbligazione",
+            "Tipo Bond"
         ],
     )
     scheda.tipo_bond = val
+
+    # AM: nuova aggiunta.
+    # Codice obbligazione
+    val = _trova_valore(
+        soup,
+        ["Codice Strumento",
+        "Instrument ID"]
+    )
+    scheda.codice_strumento = val
+
+    # AM: nuova aggiunta.
+    # Modalita' di negoziazione
+    val = _trova_valore(
+        soup,
+        ["Modalità di Negoziazione",
+        "Modalit&agrave; di Negoziazione",
+        "Modalit\\&agrave; di Negoziazione",
+        "Modalit\\&agrave\\; di Negoziazione",
+        "Trading Type"]
+    )
+    scheda.modalita_negoziazione = val
 
     # Lotto minimo
     val = _trova_valore(
@@ -782,6 +855,7 @@ def _arricchisci_obbligazione(
     )
     scheda.convenzione_giorni = val
 
+    # AM: nuova aggiunta.
     # Struttura bond
     val = _trova_valore(
         soup,
@@ -814,6 +888,53 @@ def _arricchisci_obbligazione(
         ],
     )
     scheda.tipologia = val
+
+    # Volume
+    val = _trova_valore(
+        soup,
+        [
+            "Volume totale",
+            "Volume Totale",
+            "Total Quantity",
+        ],
+    )
+    scheda.volume_totale = _parsa_numero(val, lingua) if val else None
+
+    # AM: nuova aggiunta.
+    # Turnover
+    val = _trova_valore(
+        soup,
+        [
+            "Turnover",
+            "Controvalore",
+        ],
+    )
+    scheda.controvalore = _parsa_numero(val, lingua) if val else None
+
+    # AM: nuova aggiunta.
+    # Prezzo Ufficiale
+    val = _trova_valore(
+        soup,
+        [
+            "Prezzo ufficiale",
+            "Prezzo Ufficiale",
+            "Official Close",
+        ],
+    )
+    scheda.prezzo_ufficiale = _parsa_numero(val, lingua) if val else None
+
+    # AM: nuova aggiunta.
+    # Data prezzo di riferimento
+    val = _trova_valore(
+        soup,
+        [
+            "Official Close Date",
+            "Data Prezzo Ufficiale",
+            "Data Pr Ufficiale",
+            "Close Date",
+        ],
+    )
+    scheda.data_prezzo_ufficiale = _parsa_data_scheda(val, lingua) if val else None
 
     # Prezzo di riferimento
     val = _trova_valore(
