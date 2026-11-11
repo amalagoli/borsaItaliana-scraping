@@ -152,7 +152,9 @@ class SchedaStrumento:
     performance_1m: Decimal | None = None
     performance_6m: Decimal | None = None
     performance_1y: Decimal | None = None
-    indici: list[str] | None = None            # FTSE MIB, FTSE All-Share, ...
+    # AM: cambia a str con una comma-separate lista di indici
+    indici: str | None = None
+    # indici: list[str] | None = None            # FTSE MIB, FTSE All-Share, ...
 
 
 # ---------------------------------------------------------------------------

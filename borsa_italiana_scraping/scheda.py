@@ -1071,4 +1071,6 @@ def _arricchisci_azione(
         ],
     )
     if val:
-        scheda.indici = [s.strip() for s in val.split(",") if s.strip()]
+        l_indici = [s.strip() for s in val.split(",") if s.strip()]
+        scheda.indici = ', '.join(l_indici)
+        # scheda.indici = [s.strip() for s in val.split(",") if s.strip()]
